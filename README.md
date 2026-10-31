@@ -1,6 +1,26 @@
-<img src="./docs/portfolio-cover.svg" width="900" alt="ZeroSQL — SQL detective game">
+<div align="center">
 
 # ZeroSQL: Полынья
+
+**Расследуй преступления. Пиши SQL. Собирай доказательства.**
+
+Next.js · React · SQLite / WebAssembly · TypeScript
+
+[Играть в браузере](https://fatalbazuka.ru/zerosql/) · [Кейс проекта](https://fatalbazuka.ru/projects/zerosql/)
+
+</div>
+
+<a href=".github/media/desk.webp"><img src=".github/media/desk.webp" alt="Рабочий стол аналитика ZeroSQL: SQL-терминал, материалы дела и рация" width="1000"></a>
+
+| Материалы расследования | SQL в действии |
+| --- | --- |
+| <a href=".github/media/board.webp"><img src=".github/media/board.webp" alt="Материалы расследования" width="470"></a> | <a href=".github/media/lesson.webp"><img src=".github/media/lesson.webp" alt="SQL в действии" width="470"></a> |
+
+*Скриншоты опубликованной версии игры с сайта проекта. Этот репозиторий содержит отдельный снимок исходного кода; интерфейс опубликованной версии может отличаться. Нажмите на изображение, чтобы открыть его целиком.*
+
+---
+
+## О проекте
 
 Браузерный SQL-детектив. Полярная ночь, город Полынья, цокольный этаж ГУ МВД. Игрок — дежурный аналитик ОЦР, его единственный инструмент — SQL к ведомственной системе «Зеркало». **Запросы — это геймплей**: игра проверяет результат запроса, а не его текст, и засчитывает любой корректный запрос.
 
