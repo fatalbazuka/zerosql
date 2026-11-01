@@ -88,12 +88,12 @@ export function hintTierAllowed(mode: PlayMode, tier: number): boolean {
 }
 
 /**
- * Бесплатен ли уровень: наводка в «Новичке»; «Понятие» — при первом появлении
+ * Бесплатен ли уровень: вся помощь в прологе и «Новичке»; «Понятие» — при первом появлении
  * понятия (оно входит в concepts этого дела). Жетон после второй неудачной
  * сверки учитывает стор.
  */
 export function hintTierFree(mode: PlayMode, tier: number, caseDef: CaseDef, concept: string | undefined): boolean {
-  if (tier === 1 && mode === "novice") return true;
+  if (caseDef.difficulty === "tutorial" || mode === "novice") return true;
   if (tier === 2 && concept !== undefined && caseDef.concepts.includes(concept)) return true;
   return false;
 }
@@ -197,7 +197,7 @@ export const DEFAULT_SETTINGS: Settings = {
 
 export const DEFAULT_PROFILE: Profile = {
   playerName: "",
-  mode: "standard",
+  mode: "novice",
   ageConfirmed: false,
   coldOpenSeen: false,
   onboarded: false,

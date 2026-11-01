@@ -89,6 +89,8 @@ function feedback(id: string, sql: string): string | null {
 // ------------------------------------------------------------------ альтернативы и ошибки
 
 const ALTERNATIVES: Record<string, string[]> = {
+  p3a: ["SELECT description, address_text, reported_at FROM incidents WHERE reported_at >= '2026-12-02 16:00:00';"],
+  p3b: ["SELECT * FROM incidents WHERE kind = 'сообщение гражданина' AND reported_at >= '2026-12-02 16:00:00';"],
   p1: [
     "select * from incidents limit 10",
     "SELECT * FROM incidents WHERE id <= 10;",
@@ -122,6 +124,8 @@ const ALTERNATIVES: Record<string, string[]> = {
 };
 
 const MISTAKES: Record<string, string[]> = {
+  p3a: ["SELECT * FROM staff", "SELECT reported_at FROM incidents WHERE reported_at >= '2026-12-02 16:00:00'"],
+  p3b: ["SELECT * FROM staff", "SELECT * FROM incidents WHERE reported_at >= '2026-12-02 16:00:00'"],
   p1: [
     "SELECT * FROM incidents LIMIT 5;",
     "SELECT * FROM incidents WHERE id > 40 LIMIT 10;",
@@ -173,15 +177,6 @@ const MISTAKES: Record<string, string[]> = {
   ],
 };
 
-/** Уровень 4 подсказок («Ирочкина шпаргалка»): ровно одна ошибка — и задача не засчитывается */
-const CHEAT_SHEETS: Record<string, string> = {
-  p1: "SELECT * FORM incidents LIMIT 10;",
-  p2: "SELECT reported_at, district, kind, description, FROM incidents LIMIT 10;",
-  p3: "SELECT * FROM incidents WHERE reported_at >= '02.12.2026 16:00:00';",
-  p4: "SELECT reported_at, district, address_text, description FROM incidents WHERE reported_at >= '2026-12-02 16:00:00' AND kind = 'сообщение гражданина' ORDER BY reported_at;",
-  p5: "SELECT * FROM staff WHERE login = nol;",
-  p4b: "SELECT ts, card_no, holder_text, route, stop FROM transit_taps WHERE route = '3' AND card_kind = 'Школьная' ORDER BY ts;",
-};
 
 /** Ключевые слова из более поздних дел (строгая лестница, разд. 4.1, п. 8) */
 const FUTURE_KEYWORDS = [
@@ -217,7 +212,7 @@ describe("Пролог: контент дела", () => {
     expect(c00.tables).toEqual(["incidents", "staff", "transit_taps"]);
     expect(c00.newTables).toEqual(c00.tables);
     expect(c00.starterSql).toBe("SELECT * FROM incidents LIMIT 10;");
-    expect(mainObjectives(c00).map((o) => o.id)).toEqual(["p1", "p2", "p3", "p4", "p5"]);
+    expect(mainObjectives(c00).map((o) => o.id)).toEqual(["p1", "p2", "p3", "p3a", "p3b", "p4", "p5"]);
     expect(c00.objectives.filter((o) => o.optional).map((o) => o.id)).toEqual(["p4b"]);
     expect(c00.protocol?.batchSize).toBe(2);
   });
@@ -226,7 +221,7 @@ describe("Пролог: контент дела", () => {
     for (const o of c00.objectives) {
       expect(o.hints.length, o.id).toBe(4);
       for (const h of o.hints) expect(h.by, o.id).toBeDefined();
-      expect(o.evidence?.id, o.id).toMatch(/^ev\.c00\./);
+      if (!["p3a", "p3b"].includes(o.id)) expect(o.evidence?.id, o.id).toMatch(/^ev\.c00\./);
       expect(o.solution.trim(), o.id).not.toBe("");
       expect(handbookById.has(o.concept as string), o.id).toBe(true);
     }
@@ -342,12 +337,12 @@ describe("Пролог: правдоподобные ошибки не засч�
     }
   });
 
-  it("«Ирочкина шпаргалка» (уровень 4) — с одной ошибкой и не засчитывается", () => {
+  it("последний уровень помощи даёт рабочее решение", () => {
     for (const o of c00.objectives) {
-      const sheet = CHEAT_SHEETS[o.id];
+      const sheet = o.solution;
       expect(sheet, o.id).toBeDefined();
       expect(o.hints[3].text, o.id).toContain(sheet);
-      expect(passes(o.id, sheet), o.id).toBe(false);
+      expect(passes(o.id, sheet), o.id).toBe(true);
     }
   });
 

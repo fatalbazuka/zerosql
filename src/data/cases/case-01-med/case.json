@@ -35,13 +35,44 @@
     "vehicles"
   ],
   "briefing": "03.12.2026, 21:30. Три ночи подряд — 30.11, 01.12 и 02.12 — на подстанции «Промзона-2» срезают медный кабель. Подстанция питает новый зал «Глубины», корпорация звонит начальству. Сторож видел синий фургон «Сайгак», в номере «вроде 372». Открыт доступ к «Дорсети»: камеры (cameras), проезды (plate_reads) и реестр машин (vehicles).",
-  "starterSql": "-- Кражи последних дней. Допиши фильтр по описанию и по датам.\nSELECT id, reported_at, kind, district, description\nFROM incidents\nWHERE kind = 'кража'\nORDER BY reported_at DESC\nLIMIT 10;",
+  "starterSql": "SELECT reported_at, description\nFROM incidents\nWHERE kind = 'кража';",
   "introScene": "intro",
   "objectives": [
     {
+      "id": "o1_start",
+      "order": 0.5,
+      "task": "Начни со знакомого отбора краж. Перед ; добавь AND description LIKE '%кабел%'. LIKE ищет по образцу, % — любой текст до и после «кабел».",
+      "concept": "h.like",
+      "scaffoldSql": "SELECT reported_at, description\nFROM incidents\nWHERE kind = 'кража';",
+      "validation": {
+        "type": "rows_match",
+        "referenceQuery": "SELECT reported_at, description FROM incidents WHERE kind = 'кража' AND description LIKE '%кабел%'"
+      },
+      "hints": [
+        {
+          "by": "mira",
+          "text": "Начни со знакомого отбора краж. Перед ; добавь AND description LIKE '%кабел%'. LIKE ищет по образцу, % — любой текст до и после «кабел»."
+        },
+        {
+          "by": "mira",
+          "text": "Нашли упоминания кабеля. Следующим шагом ограничим даты."
+        },
+        {
+          "by": "mira",
+          "text": "Сравни основу в редакторе с условием. Меняем только один фрагмент."
+        },
+        {
+          "by": "mira",
+          "text": "Рабочий пример: `SELECT reported_at, description FROM incidents WHERE kind = 'кража' AND description LIKE '%кабел%';`"
+        }
+      ],
+      "success": "Нашли упоминания кабеля. Следующим шагом ограничим даты.",
+      "solution": "SELECT reported_at, description FROM incidents WHERE kind = 'кража' AND description LIKE '%кабел%';"
+    },
+    {
       "id": "o1_1",
       "order": 1,
-      "task": "Кражи кабеля за три ночи. Отбери в incidents кражи (kind = 'кража'), где в описании есть «кабел» — description LIKE '%кабел%', — заявленные с 30.11 по 02.12 включительно: reported_at BETWEEN '2026-11-30 00:00:00' AND '…'.",
+      "task": "Оставь заявления за три дня. Перед ; добавь AND reported_at BETWEEN '2026-11-30 00:00:00' AND '2026-12-02 23:59:59'. BETWEEN включает обе границы; время конца дня нужно целиком.",
       "concept": "h.between",
       "validation": {
         "type": "rows_match",
@@ -63,7 +94,7 @@
         },
         {
           "by": "nina",
-          "text": "Ирочкина шпаргалка, голубчик. Ошибка в ней одна — Ирочка так проверяла, кто думает, а кто списывает: SELECT reported_at, description FROM incidents WHERE kind = 'кража' AND description LIKE '%кабел%' AND reported_at BETWEEN '2026-11-30' AND '2026-12-02';"
+          "text": "Рабочий пример: `SELECT id, kusp_no, reported_at, address_text, description\nFROM incidents\nWHERE kind = 'кража'\n  AND description LIKE '%кабел%'\n  AND reported_at BETWEEN '2026-11-30 00:00:00' AND '2026-12-02 23:59:59'\nORDER BY reported_at;`"
         }
       ],
       "success": "Три заявления подстанции: 30.11 в 08:20, 01.12 в 08:05, 02.12 в 08:15. Режут ночью, находят утром.",
@@ -74,13 +105,76 @@
         "text": "КУСП 4688, 4703, 4717. 30.11 08:20, 01.12 08:05, 02.12 08:15: «Срезан медный кабель, ПС «Промзона-2»». Заявитель — подстанция."
       },
       "sceneAfter": "substation",
-      "solution": "SELECT id, kusp_no, reported_at, address_text, description\nFROM incidents\nWHERE kind = 'кража'\n  AND description LIKE '%кабел%'\n  AND reported_at BETWEEN '2026-11-30 00:00:00' AND '2026-12-02 23:59:59'\nORDER BY reported_at;"
+      "solution": "SELECT id, kusp_no, reported_at, address_text, description\nFROM incidents\nWHERE kind = 'кража'\n  AND description LIKE '%кабел%'\n  AND reported_at BETWEEN '2026-11-30 00:00:00' AND '2026-12-02 23:59:59'\nORDER BY reported_at;",
+      "scaffoldSql": "SELECT reported_at, description FROM incidents WHERE kind = 'кража' AND description LIKE '%кабел%';"
+    },
+    {
+      "id": "o1_night",
+      "order": 1.1,
+      "task": "Проверь первую ночь. В готовой основе замени LIKE '%000%' на LIKE '%372%': сторож запомнил эти три цифры. Камера 12 и время с 01:00 до 04:00 уже указаны.",
+      "concept": "h.like",
+      "scaffoldSql": "SELECT plate, read_at FROM plate_reads WHERE camera_id = 12 AND plate LIKE '%000%' AND read_at BETWEEN '2026-11-30 01:00:00' AND '2026-11-30 04:00:00';",
+      "validation": {
+        "type": "rows_match",
+        "referenceQuery": "SELECT plate, read_at FROM plate_reads WHERE camera_id = 12 AND plate LIKE '%372%' AND read_at BETWEEN '2026-11-30 01:00:00' AND '2026-11-30 04:00:00'"
+      },
+      "hints": [
+        {
+          "by": "mira",
+          "text": "Проверь первую ночь. В готовой основе замени LIKE '%000%' на LIKE '%372%': сторож запомнил эти три цифры. Камера 12 и время с 01:00 до 04:00 уже указаны."
+        },
+        {
+          "by": "mira",
+          "text": "Это проезды первой ночи, а не весь список подозреваемых. Добавим ещё две ночи."
+        },
+        {
+          "by": "mira",
+          "text": "Сравни основу в редакторе с условием. Меняем только один фрагмент."
+        },
+        {
+          "by": "mira",
+          "text": "Рабочий пример: `SELECT plate, read_at FROM plate_reads WHERE camera_id = 12 AND plate LIKE '%372%' AND read_at BETWEEN '2026-11-30 01:00:00' AND '2026-11-30 04:00:00';`"
+        }
+      ],
+      "success": "Это проезды первой ночи, а не весь список подозреваемых. Добавим ещё две ночи.",
+      "solution": "SELECT plate, read_at FROM plate_reads WHERE camera_id = 12 AND plate LIKE '%372%' AND read_at BETWEEN '2026-11-30 01:00:00' AND '2026-11-30 04:00:00';"
+    },
+    {
+      "id": "o1_windows",
+      "order": 1.2,
+      "task": "Расширь поиск на три ночи. В основе замени только две даты 2026-12-03 на 2026-12-02. OR означает «любое из окон», скобки применяют камеру и номер ко всем трём окнам.",
+      "concept": "h.or_parens",
+      "scaffoldSql": "SELECT plate, read_at\nFROM plate_reads\nWHERE camera_id = 12\n  AND plate LIKE '%372%'\n  AND (\n    read_at BETWEEN '2026-11-30 01:00:00' AND '2026-11-30 04:00:00'\n    OR read_at BETWEEN '2026-12-01 01:00:00' AND '2026-12-01 04:00:00'\n    OR read_at BETWEEN '2026-12-03 01:00:00' AND '2026-12-03 04:00:00'\n  );",
+      "validation": {
+        "type": "rows_match",
+        "referenceQuery": "SELECT plate, read_at\nFROM plate_reads\nWHERE camera_id = 12\n  AND plate LIKE '%372%'\n  AND (\n    read_at BETWEEN '2026-11-30 01:00:00' AND '2026-11-30 04:00:00'\n    OR read_at BETWEEN '2026-12-01 01:00:00' AND '2026-12-01 04:00:00'\n    OR read_at BETWEEN '2026-12-02 01:00:00' AND '2026-12-02 04:00:00'\n  )"
+      },
+      "hints": [
+        {
+          "by": "mira",
+          "text": "Расширь поиск на три ночи. В основе замени только две даты 2026-12-03 на 2026-12-02. OR означает «любое из окон», скобки применяют камеру и номер ко всем трём окнам."
+        },
+        {
+          "by": "mira",
+          "text": "Теперь видны проезды за три ночи. Один номер встречается несколько раз."
+        },
+        {
+          "by": "mira",
+          "text": "Сравни основу в редакторе с условием. Меняем только один фрагмент."
+        },
+        {
+          "by": "mira",
+          "text": "Рабочий пример: `SELECT plate, read_at\nFROM plate_reads\nWHERE camera_id = 12\n  AND plate LIKE '%372%'\n  AND (\n    read_at BETWEEN '2026-11-30 01:00:00' AND '2026-11-30 04:00:00'\n    OR read_at BETWEEN '2026-12-01 01:00:00' AND '2026-12-01 04:00:00'\n    OR read_at BETWEEN '2026-12-02 01:00:00' AND '2026-12-02 04:00:00'\n  );`"
+        }
+      ],
+      "success": "Теперь видны проезды за три ночи. Один номер встречается несколько раз.",
+      "solution": "SELECT plate, read_at\nFROM plate_reads\nWHERE camera_id = 12\n  AND plate LIKE '%372%'\n  AND (\n    read_at BETWEEN '2026-11-30 01:00:00' AND '2026-11-30 04:00:00'\n    OR read_at BETWEEN '2026-12-01 01:00:00' AND '2026-12-01 04:00:00'\n    OR read_at BETWEEN '2026-12-02 01:00:00' AND '2026-12-02 04:00:00'\n  );"
     },
     {
       "id": "o1_2",
       "order": 2,
-      "task": "Сторож видел «вроде 372». Какие номера с «372» видела камера 12 в эти три ночи с 01:00 до 04:00? Три окна по времени соедини через OR и возьми в скобки, повторы убери через DISTINCT.",
-      "concept": "h.or_parens",
+      "task": "Собери список номеров без повторов. В предыдущем запросе замени SELECT plate, read_at на SELECT DISTINCT plate. Все условия оставь: DISTINCT убирает повторяющиеся номера.",
+      "concept": "h.distinct",
       "validation": {
         "type": "column_values",
         "columns": [
@@ -109,7 +203,7 @@
         },
         {
           "by": "nina",
-          "text": "Ирочкина шпаргалка. Одна ошибка, голубчик, как всегда: SELECT DISTINCT plate FROM plate_reads WHERE camera_id = 12 AND plate LIKE '%372%' AND read_at BETWEEN '2026-11-30 01:00:00' AND '2026-11-30 04:00:00' OR read_at BETWEEN '2026-12-01 01:00:00' AND '2026-12-01 04:00:00' OR read_at BETWEEN '2026-12-02 01:00:00' AND '2026-12-02 04:00:00';"
+          "text": "Рабочий пример: `SELECT DISTINCT plate\nFROM plate_reads\nWHERE camera_id = 12\n  AND plate LIKE '%372%'\n  AND (\n    read_at BETWEEN '2026-11-30 01:00:00' AND '2026-11-30 04:00:00'\n    OR read_at BETWEEN '2026-12-01 01:00:00' AND '2026-12-01 04:00:00'\n    OR read_at BETWEEN '2026-12-02 01:00:00' AND '2026-12-02 04:00:00'\n  );`"
         }
       ],
       "success": "Камера 12 видела три номера: К372ОК, его двойник K372OK с латинскими буквами и Е372ВХ.",
@@ -120,7 +214,8 @@
         "text": "Ночи 30.11–02.12, с 01:00 до 04:00: К372ОК, K372OK (латиница, уверенность 0,68), Е372ВХ (01.12, 03:30)."
       },
       "sceneAfter": "tokha_ocr",
-      "solution": "SELECT DISTINCT plate\nFROM plate_reads\nWHERE camera_id = 12\n  AND plate LIKE '%372%'\n  AND (\n    read_at BETWEEN '2026-11-30 01:00:00' AND '2026-11-30 04:00:00'\n    OR read_at BETWEEN '2026-12-01 01:00:00' AND '2026-12-01 04:00:00'\n    OR read_at BETWEEN '2026-12-02 01:00:00' AND '2026-12-02 04:00:00'\n  );"
+      "solution": "SELECT DISTINCT plate\nFROM plate_reads\nWHERE camera_id = 12\n  AND plate LIKE '%372%'\n  AND (\n    read_at BETWEEN '2026-11-30 01:00:00' AND '2026-11-30 04:00:00'\n    OR read_at BETWEEN '2026-12-01 01:00:00' AND '2026-12-01 04:00:00'\n    OR read_at BETWEEN '2026-12-02 01:00:00' AND '2026-12-02 04:00:00'\n  );",
+      "scaffoldSql": "SELECT plate, read_at\nFROM plate_reads\nWHERE camera_id = 12\n  AND plate LIKE '%372%'\n  AND (\n    read_at BETWEEN '2026-11-30 01:00:00' AND '2026-11-30 04:00:00'\n    OR read_at BETWEEN '2026-12-01 01:00:00' AND '2026-12-01 04:00:00'\n    OR read_at BETWEEN '2026-12-02 01:00:00' AND '2026-12-02 04:00:00'\n  );"
     },
     {
       "id": "o1_3",
@@ -173,7 +268,7 @@
         },
         {
           "by": "nina",
-          "text": "Ирочкина шпаргалка. Ищи ошибку, голубчик, она одна: SELECT plate, make, owner_name, sold_at, deregistered_at FROM vehicles WHERE plate IN ('К372ОК', 'K372OK', 'Е372ВХ') AND make = 'Сайгак' AND deregistered_at IS NULL;"
+          "text": "Рабочий пример: `SELECT plate, make, color, owner_name, registered_at, sold_at, deregistered_at\nFROM vehicles\nWHERE plate IN ('К372ОК', 'K372OK', 'Е372ВХ')\n  AND make LIKE '%сайгак%'\n  AND deregistered_at IS NULL;`"
         }
       ],
       "success": "К372ОК — синий «САЙГАК», владелец Шпаков Георгий Ильич. В графе sold_at пусто: машину никто не продавал. K372OK в реестре нет — это та же машина, прочитанная криво.",
@@ -211,7 +306,7 @@
         },
         {
           "by": "nina",
-          "text": "Ирочкина шпаргалка. Одна ошибка, голубчик, и та — в буквах: SELECT read_at, plate FROM plate_reads WHERE camera_id = 12 AND plate = 'К372ОК' AND (read_at BETWEEN '2026-11-30 01:00:00' AND '2026-11-30 04:00:00' OR read_at BETWEEN '2026-12-01 01:00:00' AND '2026-12-01 04:00:00' OR read_at BETWEEN '2026-12-02 01:00:00' AND '2026-12-02 04:00:00');"
+          "text": "Рабочий пример: `SELECT read_at, plate, direction, confidence\nFROM plate_reads\nWHERE camera_id = 12\n  AND plate IN ('К372ОК', 'K372OK')\n  AND (\n    read_at BETWEEN '2026-11-30 01:00:00' AND '2026-11-30 04:00:00'\n    OR read_at BETWEEN '2026-12-01 01:00:00' AND '2026-12-01 04:00:00'\n    OR read_at BETWEEN '2026-12-02 01:00:00' AND '2026-12-02 04:00:00'\n  )\nORDER BY read_at;`"
         }
       ],
       "success": "Три ночи — три проезда на выезд из Промзоны: 30.11 в 02:47, 01.12 в 02:41 (латиницей), 02.12 в 02:52.",

@@ -193,7 +193,7 @@ function typeOf(value: unknown): string {
  * Ячейка: пробелы сохраняются (white-space: pre), пробелы по краям подчёркнуты пунктиром,
  * пустая строка видна как '' — иначе ловушки «'Береговая '» и «''» не разглядеть.
  */
-function CellValue({ value }: { value: unknown }) {
+function CellValue({ value, expanded = false }: { value: unknown; expanded?: boolean }) {
   if (value === null || value === undefined) return <span className="text-ink-3">NULL</span>;
   if (value instanceof Uint8Array) return <span className="text-ink-3">BLOB, {value.byteLength} байт</span>;
   const text = String(value);
@@ -209,7 +209,7 @@ function CellValue({ value }: { value: unknown }) {
       {trail && <span className={ws}>{trail}</span>}
     </>
   );
-  return text.length > 40 ? <span className="inline-block max-w-[40ch] truncate align-top">{body}</span> : body;
+  return !expanded && text.length > 40 ? <span className="inline-block max-w-[40ch] truncate align-top">{body}</span> : body;
 }
 
 /** «street = 'Береговая '   text, 10 знаков» — значение целиком, как в панели значения */
@@ -314,7 +314,7 @@ function DataTable({
       return;
     }
     setSel({ r, c });
-    if (touch) setSheet({ r, c });
+    if (touch || window.matchMedia("(max-width: 1023px)").matches) setSheet({ r, c });
   };
 
   const onKeyDown = (e: KeyboardEvent<HTMLDivElement>) => {
@@ -325,7 +325,13 @@ function DataTable({
       return;
     }
     if (e.key === "Escape" && sel) {
+      setSheet(null);
       setSel(null);
+      return;
+    }
+    if (e.key === "Enter" && sel) {
+      e.preventDefault();
+      setSheet(sel);
       return;
     }
     const moves: Record<string, [number, number]> = {
@@ -450,8 +456,8 @@ function DataTable({
 
       {/* Панель значения: выбранная ячейка целиком, в кавычках и с типом; справа — приобщить строку */}
       {inspector && sel && !touch && (
-        <div className="flex h-6 shrink-0 items-center gap-4 border-t border-line bg-scr-base px-3 mono-12 whitespace-pre max-lg:hidden">
-          <span className="min-w-0 truncate text-ink-1">{inspector.value}</span>
+        <div className="flex max-h-40 shrink-0 items-start gap-4 overflow-y-auto border-t border-line bg-scr-base px-3 py-2 mono-12 max-lg:hidden">
+          <span className="min-w-0 break-words whitespace-pre-wrap text-ink-1">{inspector.value}</span>
           {inspector.meta && <span className="shrink-0 text-ink-3">{inspector.meta}</span>}
           {onPinRow &&
             (pinned.has(sel.r) ? (
@@ -551,7 +557,7 @@ function RowSheet({
             <div key={`${col}-${c}`} className={cn("contents", c === cell && "[&>dd]:text-ink-1 [&>dt]:text-ink-2")}>
               <dt className="truncate text-ink-3">{col}</dt>
               <dd className="break-all whitespace-pre-wrap text-ink-1">
-                <CellValue value={row[c]} />
+                <CellValue value={row[c]} expanded />
               </dd>
             </div>
           ))}

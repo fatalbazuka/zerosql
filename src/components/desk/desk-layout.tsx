@@ -13,6 +13,7 @@ import type { DeskCenterView, DeskPanelId } from "@/types/ui";
 import { cn } from "@/lib/utils";
 import { PanelHeader, TabBar, screenButtonClass } from "@/components/kit/screen";
 import { typo } from "@/components/kit/typo";
+import { RichText } from "@/components/kit/rich-text";
 import { MirrorMenuBar, MirrorMenuButton, type DeskMenuAction, type DeskMenuGroup } from "./menu-bar";
 import { StatusBar, type StatusMessage } from "./status-bar";
 import { DeskCenterTabsContext } from "./center-tabs";
@@ -21,13 +22,15 @@ import { SCHEMA_INSERT_EVENT } from "./schema-panel";
 export type { DeskMenuAction, DeskMenuGroup } from "./menu-bar";
 export type { StatusMessage } from "./status-bar";
 
-/** Текущее задание в полосе над редактором (мобильный) */
+/** Текущая цель и помощь над редактором на всех размерах экрана. */
 export interface DeskObjectiveStrip {
   /** Номер задания: «3» */
   number?: number;
   text: string;
   /** «Не засчитано: …» или «выполнено» — свежая обратная связь после запроса */
   note?: string;
+  help?: ReactNode;
+  actions?: ReactNode;
 }
 
 export interface DeskLayoutProps {
@@ -76,7 +79,7 @@ export interface DeskLayoutProps {
   /** Строка меню: свои пункты и обработчик команд */
   menus?: DeskMenuGroup[];
   onMenuAction?: (action: DeskMenuAction) => void;
-  /** Текущее задание: на мобильном — полоса над редактором, касание открывает «Дело» */
+  /** Текущее задание рядом с SQL, отдельно от сообщения о прошлом результате. */
   currentObjective?: DeskObjectiveStrip | null;
   /** Слой поверх стола: диалог, блокировка */
   overlay?: ReactNode;
@@ -321,31 +324,27 @@ export function DeskLayout({
   /* ---------- Центр: один вид из трёх ---------- */
 
   const objectiveStrip = currentObjective ? (
-    <button
-      type="button"
-      onClick={() => {
-        selectPanel("tasks");
-        setMobileView("case");
-      }}
-      className="flex h-8 w-full shrink-0 items-center gap-2 border-b border-line bg-scr-side px-4 text-left ui-13 lg:hidden"
+    <section
+      className="w-full shrink-0 border-b border-line bg-scr-side px-4 py-3 text-left ui-14"
+      data-testid="current-objective"
+      aria-label="Текущая цель"
     >
-      {currentObjective.number !== undefined && (
-        <span className="shrink-0 mono-12 text-ink-3">{currentObjective.number}.</span>
-      )}
-      <span className={cn("min-w-0 truncate", currentObjective.note ? "text-ink-2" : "text-ink-1")}>
-        {typo(currentObjective.note ?? currentObjective.text)}
-      </span>
-    </button>
+      <p className="mb-1 ui-12 text-ink-3">{currentObjective.number ? `Шаг ${currentObjective.number}. ` : ""}Что сделать сейчас</p>
+      <p className="text-ink-1"><RichText text={currentObjective.text} /></p>
+      {currentObjective.note && <p className="mt-1 ui-12 text-ink-2" role="status">{typo(currentObjective.note)}</p>}
+      {currentObjective.actions}
+      {currentObjective.help}
+    </section>
   ) : null;
 
   const queryView = (
     <div
       ref={centerRef}
-      className={cn("flex h-full min-h-0 min-w-0 flex-col", dragging && "cursor-row-resize select-none")}
+      className={cn("flex h-full min-h-0 min-w-0 flex-col max-lg:overflow-y-auto", dragging && "cursor-row-resize select-none")}
       style={terminalBasis}
     >
       {objectiveStrip}
-      <div className="flex min-h-0 shrink-0 flex-col max-lg:h-[calc(40%+44px)] max-lg:min-h-[204px] lg:h-(--term)">
+      <div className="flex min-h-0 shrink-0 flex-col max-lg:h-[204px] lg:h-(--term)">
         {terminal}
       </div>
       <div
@@ -362,7 +361,7 @@ export function DeskLayout({
         onKeyDown={onSplitKey}
         className="relative z-10 hidden h-px shrink-0 cursor-row-resize touch-none bg-line outline-none before:absolute before:inset-x-0 before:-top-[3px] before:h-[7px] focus-visible:bg-ink-1 lg:block"
       />
-      <div className="flex min-h-0 flex-1 flex-col max-lg:border-t max-lg:border-line">{results}</div>
+      <div className="flex min-h-0 flex-1 flex-col max-lg:min-h-[260px] max-lg:shrink-0 max-lg:border-t max-lg:border-line">{results}</div>
     </div>
   );
 
@@ -500,7 +499,7 @@ export function DeskLayout({
             schemaOpen
               ? "lg:grid-cols-[216px_minmax(0,1fr)_336px]"
               : "lg:grid-cols-[28px_minmax(0,1fr)_336px]",
-            "xl:grid-cols-[232px_minmax(560px,1fr)_352px] min-[1440px]:grid-cols-[248px_minmax(560px,1fr)_384px]"
+            schemaOpen && "xl:grid-cols-[232px_minmax(0,1fr)_336px]"
           )}
         >
           {/* Схема */}
@@ -516,15 +515,15 @@ export function DeskLayout({
               onClick={() => setSchemaOpen(true)}
               aria-label="Показать схему"
               className={cn(
-                "hidden h-full w-7 items-start justify-center pt-3 ui-13 font-medium text-ink-2 hover:bg-scr-raise hover:text-ink-1 xl:hidden",
+                "hidden h-full w-7 items-start justify-center pt-3 ui-13 font-medium text-ink-2 hover:bg-scr-raise hover:text-ink-1",
                 !schemaOpen && "lg:flex"
               )}
             >
               <span className="[writing-mode:vertical-rl]">Схема</span>
             </button>
-            <div className={cn("flex min-h-0 flex-1 flex-col", !schemaOpen && "lg:max-xl:hidden")}>
+            <div className={cn("flex min-h-0 flex-1 flex-col", !schemaOpen && "lg:hidden")}>
               {schema}
-              <div className="hidden h-6 shrink-0 items-center border-t border-line px-3 lg:max-xl:flex">
+              <div className="hidden h-6 shrink-0 items-center border-t border-line px-3 lg:flex">
                 <button
                   type="button"
                   onClick={() => setSchemaOpen(false)}

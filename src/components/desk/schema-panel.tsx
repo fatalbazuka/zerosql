@@ -54,6 +54,7 @@ export function SchemaPanel({
   // Подсветка новой таблицы держится, пока игрок её не заметил (наведение или раскрытие)
   const [noticed, setNoticed] = useState<Set<string>>(() => new Set(defaultExpanded));
   const [focusKey, setFocusKey] = useState<string | null>(null);
+  const [showLocked, setShowLocked] = useState(false);
   const treeRef = useRef<HTMLDivElement>(null);
   const isOpen = (name: string) => unlockedTables === null || unlockedTables.includes(name);
 
@@ -71,7 +72,7 @@ export function SchemaPanel({
       for (const col of table.columns) rows.push({ key: `c:${table.name}.${col.name}`, kind: "column", table, col, level: 2 });
     }
   }
-  for (const table of locked) rows.push({ key: `l:${table.name}`, kind: "locked", table, level: 1 });
+  if (showLocked) for (const table of locked) rows.push({ key: `l:${table.name}`, kind: "locked", table, level: 1 });
   for (const fk of relations) rows.push({ key: `r:${fk.from}.${fk.fromColumn}`, kind: "relation", fk, level: 1 });
   const activeKey = rows.some((r) => r.key === focusKey) ? focusKey : (rows[0]?.key ?? null);
 
@@ -233,7 +234,7 @@ export function SchemaPanel({
             );
           })}
 
-          {locked.map((table) => {
+          {(showLocked ? locked : []).map((table) => {
             const key = `l:${table.name}`;
             return (
               <HintTooltip key={key} content="Засекречено. Допуск не выдан." side="right">
@@ -259,6 +260,10 @@ export function SchemaPanel({
             );
           })}
         </ul>
+        {locked.length > 0 && <button type="button" className="w-full px-3 py-3 text-left ui-12 text-ink-3 hover:text-ink-1" aria-expanded={showLocked} onClick={() => {
+          setShowLocked(!showLocked);
+          setFocusKey(null);
+        }}>{showLocked ? "Скрыть закрытые разделы" : `Закрытые разделы: ${locked.length}`}</button>}
 
         {relations.length > 0 && (
           <div className="pt-4">

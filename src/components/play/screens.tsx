@@ -64,7 +64,7 @@ const MODE_NOTES: Record<PlayMode, string> = {
  */
 export function OnboardingDialog({
   defaultName = "",
-  defaultMode = "standard",
+  defaultMode = "novice",
   zeroOpen = false,
   warning,
   onDone,
@@ -117,6 +117,7 @@ export function OnboardingDialog({
             </select>
           </div>
           <p className="mt-2 ml-[116px] ui-12 text-ink-3">{MODE_NOTES[mode]}</p>
+          <p className="mt-3 ui-13 text-ink-2">SQL знать не нужно. В прологе помощь бесплатна, запросы разбираем по одному приёму.</p>
           <p className="mt-3 ui-12 text-ink-3">Так вас будут называть в субтитрах и документах. Изменить можно в параметрах.</p>
           {warning && <p className="mt-2 ui-13 text-ink-1">{warning}</p>}
         </div>

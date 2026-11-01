@@ -32,6 +32,7 @@ import { LockScreen } from "@/components/title/title-screen";
 import { AccusationPanel, PredictionPrompt } from "@/components/play/accusation";
 import { MirrorWindow } from "@/components/play/mirror-window";
 import { ScreenButton } from "@/components/kit/screen";
+import { RichText } from "@/components/kit/rich-text";
 import { achievements, secrets } from "@/data";
 import { CHARACTERS, caseCode, caseNo, clockRu, sceneTitle, evidenceCard, handbookFor, hhmm, pinCard, protocolQuestions, uiObjectives } from "./views";
 import { useSceneLayer } from "./scene-layer";
@@ -144,6 +145,8 @@ export function CaseDesk({
   const main = objectives.filter((o) => !o.optional);
   const current = main.find((o) => o.state === "active");
   const currentNo = current ? main.indexOf(current) + 1 : null;
+  const currentDef = def.objectives.find((o) => o.id === current?.id);
+  const [restoreDraft, setRestoreDraft] = useState<string | null>(null);
   const doneNo = last ? main.findIndex((o) => o.id === last.completed[0]) + 1 : 0;
   const note: ResultObjectiveNote | null =
     !last || last.result.error
@@ -393,7 +396,37 @@ export function CaseDesk({
       badges={cards.length ? { evidence: cards.length } : {}}
       badgeAlerts={unseen ? ["evidence"] : []}
       statusMessage={status}
-      currentObjective={current && currentNo ? { number: currentNo, text: current.task, ...(note ? { note: note.text } : {}) } : null}
+      currentObjective={current && currentNo ? {
+        number: currentNo,
+        text: current.task,
+        ...(note ? { note: note.text } : {}),
+        actions: (
+          <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1">
+            {currentDef?.scaffoldSql && <button type="button" data-testid="insert-scaffold" className="min-h-8 ui-13 text-ink-2 underline max-lg:min-h-11" onClick={() => {
+              setRestoreDraft(act().session!.draftSql);
+              act().setDraft(currentDef.scaffoldSql!);
+              say("Основа вставлена. Измени её по условию и нажми «Выполнить».");
+            }}>Вставить основу</button>}
+            {restoreDraft !== null && <button type="button" className="min-h-8 ui-13 text-ink-2 underline max-lg:min-h-11" onClick={() => {
+              act().setDraft(restoreDraft!);
+              setRestoreDraft(null);
+            }}>Вернуть мой запрос</button>}
+            {current.nextHint && <button type="button" data-testid="objective-help" className="min-h-8 ui-13 text-ink-2 underline max-lg:min-h-11" onClick={() => act().revealHint(current.id)}>
+              Подсказка {current.nextHint.tier}/4 — {current.nextHint.free ? "бесплатно" : "−40 к оценке"}
+            </button>}
+          </div>
+        ),
+        help: current.hints.length > 0 ? <div className="mt-2 max-h-36 overflow-y-auto ui-13 text-ink-2" data-testid="objective-hint">
+          <RichText text={current.hints[current.hints.length - 1].text} />
+          {current.hints.some((h) => h.tier === 4) && currentDef && <button type="button" data-testid="insert-solution" className="block min-h-11 underline" onClick={() => {
+            setRestoreDraft(act().session!.draftSql);
+            act().setDraft(currentDef.solution);
+          }}>Вставить рабочий пример</button>}
+        </div> : undefined,
+      } : {
+        text: "Данные найдены. Открой «Заключение», выбери ответы из результатов запросов и нажми «Сверить».",
+        actions: <ScreenButton variant="secondary" className="mt-2" onClick={() => setCenter("protocol")}>Перейти к заключению</ScreenButton>,
+      }}
       topBarExtra={
         <span className="flex items-center gap-4">
           {resume}

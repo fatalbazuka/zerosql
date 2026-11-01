@@ -25,7 +25,7 @@ import { C01 } from "@/engine/world/plants/c01";
 
 const caseDef = getCase("case-01-med") as CaseDef;
 const objective = (id: string) => caseDef.objectives.find((o) => o.id === id) as CaseObjective;
-const MAIN = ["o1_1", "o1_2", "o1_3", "o1_4"] as const;
+const MAIN = ["o1_start", "o1_1", "o1_night", "o1_windows", "o1_2", "o1_3", "o1_4"] as const;
 const CAP = caseDef.clock?.cap as string;
 
 let world: Database;
@@ -99,8 +99,8 @@ describe("контент дела", () => {
       expect(o.hints.length, o.id).toBeGreaterThanOrEqual(3);
       expect(o.hints.length, o.id).toBeLessThanOrEqual(4);
       for (const h of o.hints) expect(h.by, o.id).toBeTruthy();
-      expect(o.hints[0].line, o.id).toBe(`hint.c01_${o.id}.001`);
-      expect(o.evidence?.id, o.id).toMatch(/^ev\.c01\./);
+      if (!["o1_start", "o1_night", "o1_windows"].includes(o.id)) expect(o.hints[0].line, o.id).toBe(`hint.c01_${o.id}.001`);
+      if (!["o1_start", "o1_night", "o1_windows"].includes(o.id)) expect(o.evidence?.id, o.id).toMatch(/^ev\.c01\./);
       expect(o.solution.trim(), o.id).not.toBe("");
     }
   });
@@ -110,7 +110,7 @@ describe("контент дела", () => {
       for (const h of o.hints) {
         const at = h.text.indexOf("SELECT");
         if (at < 0 || /__|…/.test(h.text)) continue;
-        const sql = h.text.slice(at);
+        const sql = h.text.slice(at).replace(/`$/, "");
         expect(run(sql).error, `${o.id}: ${sql}`).toBeNull();
       }
     }

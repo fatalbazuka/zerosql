@@ -54,6 +54,7 @@ export function useSceneLayer(items: EvidenceCardData[], locationLabel?: string)
         key={`${stage.scene.id}:${inst.n}`}
         variant="overlay"
         scene={stage.scene}
+        background={stage.scene.location === "basement_b0_03_evening" ? "/backgrounds/basement_b0_03_evening.webp" : undefined}
         characters={CHARACTERS}
         evidence={items}
         playerName={profile.playerName || undefined}

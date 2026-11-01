@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   calendar,
@@ -91,6 +91,19 @@ export function PlayRoot({ journal = false }: { journal?: boolean }) {
   useEffect(() => {
     if (hydrated && !profile.ageConfirmed) router.replace("/");
   }, [hydrated, profile.ageConfirmed, router]);
+
+  // В первом сеансе журнал с единственным доступным делом не требует отдельного выбора.
+  const firstOpening = useRef(false);
+  useEffect(() => {
+    if (journal || view !== "desk" || !profile.onboarded || !profile.ageConfirmed || loading.status !== "ready" || session || Object.keys(season.solved).length || firstOpening.current) return;
+    firstOpening.current = true;
+    void act().openCase(cases[0].id).then((ok) => {
+      if (!ok) {
+        setNotice("Не удалось открыть пролог. Выберите дело в журнале.");
+        setView("journal");
+      }
+    });
+  }, [journal, view, profile.onboarded, profile.ageConfirmed, loading.status, session, season.solved, act]);
 
   const overlay = (v: View) => {
     setBack(view === "settings" || view === "records" ? back : view);

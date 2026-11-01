@@ -8,7 +8,7 @@ import type { CaseSession, PersistedGame } from "./types";
 
 export const SAVE_KEY = "zerosql.season.v2";
 /** Версия схемы сохранения. Меняется — добавить шаг в MIGRATIONS */
-export const SAVE_VERSION = 2;
+export const SAVE_VERSION = 3;
 
 type Raw = Record<string, unknown>;
 const isObj = (v: unknown): v is Raw => typeof v === "object" && v !== null && !Array.isArray(v);
@@ -17,8 +17,24 @@ const isObj = (v: unknown): v is Raw => typeof v === "object" && v !== null && !
  * Шаги миграции: ключ — версия, ИЗ которой мигрируем.
  *  1 → 2: настройки typewriter / lieHighlight; у сезона появились mastery,
  *         counters и endingsSeen; у дела — closedAt и freeHintTokens.
+ *  2 → 3: завершённые составные задания включают новые учебные подшаги.
  */
 export const MIGRATIONS: Record<number, (state: Raw) => Raw> = {
+  2: (s) => {
+    if (!isObj(s.session) || !Array.isArray(s.session.completed)) return s;
+    const session = s.session;
+    const completed = [...session.completed as string[]];
+    const add = (after: string, ids: string[]) => {
+      if (completed.includes(after)) for (const id of ids) if (!completed.includes(id)) completed.push(id);
+    };
+    // Уже решённые составные задания включают новые промежуточные навыки.
+    if (session.caseId === "case-00-nulevoy-etazh") add("p4", ["p3a", "p3b"]);
+    if (session.caseId === "case-01-med") {
+      add("o1_1", ["o1_start"]);
+      add("o1_2", ["o1_night", "o1_windows"]);
+    }
+    return { ...s, session: { ...session, completed } };
+  },
   1: (s) => {
     const settings = isObj(s.settings) ? s.settings : {};
     const season = isObj(s.season) ? s.season : {};

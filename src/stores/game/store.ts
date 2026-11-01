@@ -1017,7 +1017,7 @@ export function createGameStore(options: GameStoreOptions = {}): GameStore {
                 withHint: tier >= HINT_TIERS ? pushUniq(s.withHint, obj.id) : s.withHint,
                 hintOffer: null,
               },
-              season: { ...st.season, mastery: bumpMastery(st.season.mastery, obj.concept, MASTERY.hint) },
+              season: d.difficulty === "tutorial" ? st.season : { ...st.season, mastery: bumpMastery(st.season.mastery, obj.concept, MASTERY.hint) },
             });
             const hint: HintDef | undefined = obj.hints[tier - 1];
             if (hint) bark("system", hint.by ?? MIRA, hint.text, hint.line ? { lineId: hint.line } : {});

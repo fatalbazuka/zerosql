@@ -75,13 +75,18 @@ export function ObjectiveList({
         </p>
       )}
 
-      <ol className="flex flex-col gap-4">{main.map((o, i) => item(o, i + 1))}</ol>
+      <ol className="flex flex-col gap-4">{main.filter((o) => o.id === currentId).map((o) => item(o, main.indexOf(o) + 1))}</ol>
+      {done > 0 && <details className="mt-4">
+        <summary className="cursor-pointer py-2 ui-13 text-ink-2">Выполненные задания: {done}</summary>
+        <ol className="mt-2 flex flex-col gap-4">{main.filter((o) => o.state === "done").map((o) => item(o, main.indexOf(o) + 1))}</ol>
+      </details>}
+      {main.some((o) => o.state === "locked") && <p className="mt-3 ui-12 text-ink-3">Следующее задание появится после текущего.</p>}
 
       {extra.length > 0 && (
-        <>
-          <h3 className="mt-6 mb-3 ui-13 font-medium text-ink-2">Сверх плана</h3>
+        <details className="mt-4">
+          <summary className="cursor-pointer py-2 ui-13 font-medium text-ink-2">Сверх плана: {extra.length}</summary>
           <ol className="flex flex-col gap-4">{extra.map((o, i) => item(o, main.length + i + 1))}</ol>
-        </>
+        </details>
       )}
     </section>
   );

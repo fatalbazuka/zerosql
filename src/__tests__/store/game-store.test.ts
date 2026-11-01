@@ -4,7 +4,7 @@ import { cases } from "@/data";
 import { createGameStore, type GameStore } from "@/stores/game/store";
 import { memoryStorage, migrateSave, SAVE_KEY, SAVE_VERSION } from "@/stores/game/persist";
 import { computeEnding } from "@/stores/game/endings";
-import { applyFlag, deletesEvidence, futureConcepts, isIrinaNote, tripFlags } from "@/stores/game/rules";
+import { applyFlag, deletesEvidence, futureConcepts, hintTierFree, isIrinaNote, tripFlags } from "@/stores/game/rules";
 import { calendar, interrogationView, objectivesView, protocolView } from "@/stores/game/selectors";
 import { RUNTIME_CASE } from "../runtime/fixture";
 
@@ -40,6 +40,20 @@ const makeStore = (storage = memoryStorage(), extra: Partial<Parameters<typeof c
   createGameStore({ engine: () => shared, storage: () => storage, now: NOW, ...extra });
 
 describe.skipIf(C00.objectives.length === 0)("стор v2: пролог case-00 целиком", () => {
+  it("помощь в стандартном прологе не снимает оценку или мастерство", async () => {
+    const store = makeStore();
+    store.getState().setProfile({ playerName: "Тестов", mode: "standard", onboarded: true });
+    await store.getState().boot();
+    await store.getState().openCase(C00.id);
+    await drain(store);
+    const mastery = store.getState().season.mastery;
+    for (let tier = 1; tier <= 4; tier++) {
+      expect(store.getState().revealHint("p1")).toMatchObject({ tier, free: true });
+    }
+    expect(store.getState().season.mastery).toEqual(mastery);
+    expect(store.getState().session!.hints.filter((h) => !h.free)).toHaveLength(0);
+  });
+
   it("интро → эталоны задач → протокол с пакетной сверкой → разбор", async () => {
     const store = makeStore();
     store.getState().setProfile({ playerName: "Тестов", onboarded: true });
@@ -248,6 +262,25 @@ describe("стор v2: флаги, допрос, событие, обвинен�
 });
 
 describe("стор v2: чистые правила", () => {
+  it("все уровни помощи пролога бесплатны, включая стандартный режим", () => {
+    for (const mode of ["novice", "standard", "pro", "zero"] as const) {
+      for (let tier = 1; tier <= 4; tier++) expect(hintTierFree(mode, tier, C00, "h.select")).toBe(true);
+    }
+    const med = cases.find((c) => c.order === 1)!;
+    expect(hintTierFree("novice", 4, med, "h.like")).toBe(true);
+    expect(hintTierFree("standard", 4, med, "h.like")).toBe(false);
+  });
+
+  it("старые решённые шаги включают новые учебные подшаги, черновик сохраняется", () => {
+    const draftSql = "SELECT мой_черновик;";
+    const old = { session: { caseId: C00.id, completed: ["p1", "p2", "p3", "p4"], draftSql } };
+    const migrated = migrateSave(old, 2).session!;
+    expect(migrated.completed).toEqual(["p1", "p2", "p3", "p4", "p3a", "p3b"]);
+    expect(migrated.draftSql).toBe(draftSql);
+    expect(migrateSave({ session: { caseId: C00.id, completed: ["p1"] } }, 2).session!.completed).toEqual(["p1"]);
+    expect(migrateSave({ session: { caseId: "case-01-med", completed: ["o1_1", "o1_2"] } }, 2).session!.completed)
+      .toEqual(["o1_1", "o1_2", "o1_start", "o1_night", "o1_windows"]);
+  });
   it("флаги выборов", () => {
     expect(applyFlag({}, "tokha_turned")).toEqual({ tokha_turned: true });
     expect(applyFlag({ a: 1 }, "a+2")).toEqual({ a: 3 });
@@ -259,7 +292,7 @@ describe("стор v2: чистые правила", () => {
     const m = migrateSave({ settings: { textSpeed: "fast" }, season: { solved: {} }, session: null }, 1);
     expect(m.settings).toMatchObject({ textSpeed: "fast", typewriter: true, lieHighlight: false });
     expect(m.season).toMatchObject({ mastery: {}, counters: {}, endingsSeen: [] });
-    expect(migrateSave("garbage", 0).profile.mode).toBe("standard");
+    expect(migrateSave("garbage", 0).profile.mode).toBe("novice");
   });
 
   it("концовки по разд. 3", () => {
