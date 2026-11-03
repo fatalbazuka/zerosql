@@ -86,17 +86,70 @@ export function memoryStorage(): Storage {
   };
 }
 
-/** localStorage, если доступен; иначе память */
+export type SaveStatus = "unknown" | "persistent" | "volatile";
+let saveStatus: SaveStatus = "unknown";
+const saveListeners = new Set<() => void>();
+
+function setSaveStatus(next: SaveStatus) {
+  if (saveStatus === next) return;
+  saveStatus = next;
+  saveListeners.forEach((listener) => listener());
+}
+
+export const getSaveStatus = () => saveStatus;
+export function subscribeSaveStatus(listener: () => void): () => void {
+  saveListeners.add(listener);
+  return () => saveListeners.delete(listener);
+}
+
+/** localStorage с переходом в память, в том числе при ошибке последующей записи. */
 export function browserStorage(): Storage {
+  const fallback = memoryStorage();
+  if (typeof window === "undefined") return fallback;
+  let storage: Storage;
   try {
-    if (typeof window !== "undefined" && window.localStorage) {
-      const probe = "__zerosql_probe__";
-      window.localStorage.setItem(probe, "1");
-      window.localStorage.removeItem(probe);
-      return window.localStorage;
-    }
+    storage = window.localStorage;
+    const probe = "__zerosql_probe__";
+    storage.setItem(probe, "1");
+    storage.removeItem(probe);
+    setSaveStatus("persistent");
   } catch {
-    // приватный режим / запрет хранилища
+    setSaveStatus("volatile");
+    return fallback;
   }
-  return memoryStorage();
+  let volatile = false;
+  const switchToMemory = () => {
+    volatile = true;
+    setSaveStatus("volatile");
+  };
+  return {
+    get length() {
+      if (volatile) return fallback.length;
+      try { return storage.length; } catch { switchToMemory(); return fallback.length; }
+    },
+    key(i) {
+      if (volatile) return fallback.key(i);
+      try { return storage.key(i); } catch { switchToMemory(); return fallback.key(i); }
+    },
+    getItem(key) {
+      if (volatile) return fallback.getItem(key);
+      try { return storage.getItem(key); } catch { switchToMemory(); return fallback.getItem(key); }
+    },
+    setItem(key, value) {
+      // Копия позволяет продолжить игру при исчерпании квоты во время сеанса.
+      fallback.setItem(key, value);
+      if (volatile) return;
+      try { storage.setItem(key, value); } catch { switchToMemory(); }
+    },
+    removeItem(key) {
+      fallback.removeItem(key);
+      if (volatile) return;
+      try { storage.removeItem(key); } catch { switchToMemory(); }
+    },
+    clear() {
+      fallback.clear();
+      if (volatile) return;
+      try { storage.clear(); } catch { switchToMemory(); }
+    },
+  };
 }

@@ -87,4 +87,6 @@ export type ValidationRule =
 export interface ValidationOutcome {
   passed: boolean;
   message: string;
+  /** Проверка не может сделать вывод; отрицание не должно превращать её в успех. */
+  inconclusive?: boolean;
 }

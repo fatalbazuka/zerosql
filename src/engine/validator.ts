@@ -51,7 +51,11 @@ function compareColumn(
 }
 
 function referenceError(): ValidationOutcome {
-  return { passed: false, message: "Ошибка в эталонном запросе. Сообщите разработчику." };
+  return { passed: false, inconclusive: true, message: "Ошибка или слишком много строк в эталонном запросе. Сообщите разработчику." };
+}
+
+function incompleteResult(): ValidationOutcome {
+  return { passed: false, inconclusive: true, message: "Результат слишком большой для полной проверки. Уточните запрос с помощью WHERE или LIMIT." };
 }
 
 function matchOptions(rule: { tolerance?: number; precision?: DatetimePrecision }) {
@@ -108,6 +112,11 @@ export function validate(
     return { passed: false, message: "Запрос вернул ошибку. Проверьте синтаксис." };
   }
 
+  // Эти правила зависят от всего набора строк, а не только от первых 5000.
+  if (result.truncated && ["row_count", "exact_match", "column_values", "rows_match", "custom"].includes(rule.type)) {
+    return incompleteResult();
+  }
+
   switch (rule.type) {
     case "row_count": {
       const { expected, comparison } = rule;
@@ -155,6 +164,7 @@ export function validate(
           String(row[colIdx]).toLowerCase() ===
           String(rule.value).toLowerCase()
       );
+      if (!found && result.truncated) return incompleteResult();
       return {
         passed: found,
         message: found
@@ -165,9 +175,7 @@ export function validate(
 
     case "exact_match": {
       const ref = executeQuery(db, rule.referenceQuery);
-      if (ref.error) {
-        return { passed: false, message: "Ошибка в эталонном запросе. Сообщите разработчику." };
-      }
+      if (ref.error || ref.truncated) return referenceError();
       const refNorm = normalizeRows(ref.rows);
       const resNorm = normalizeRows(result.rows);
       const passed =
@@ -192,6 +200,7 @@ export function validate(
         };
       }
       if (rule.minRows !== undefined && result.rowCount < rule.minRows) {
+        if (result.truncated) return incompleteResult();
         return {
           passed: false,
           message: `Ожидалось не менее ${rule.minRows} записей, получено ${result.rowCount}.`,
@@ -216,6 +225,7 @@ export function validate(
       const found = result.rows.some((row) =>
         String(row[colIdx]).toLowerCase().includes(rule.substring.toLowerCase())
       );
+      if (!found && result.truncated) return incompleteResult();
       return {
         passed: found,
         message: found
@@ -226,6 +236,7 @@ export function validate(
 
     case "value_check": {
       if (rule.row >= result.rowCount) {
+        if (result.truncated) return incompleteResult();
         return { passed: false, message: "Недостаточно строк в результате." };
       }
       const val = Number(result.rows[rule.row]?.[rule.col]);
@@ -258,14 +269,16 @@ export function validate(
 
     case "any_of": {
       let lastFailMessage = "";
+      let uncertain: ValidationOutcome | undefined;
       for (const subRule of rule.rules) {
         const sub = validate(subRule, result, db, ctx);
         if (sub.passed) {
           return { passed: true, message: rule.successMessage };
         }
+        if (sub.inconclusive) uncertain = sub;
         lastFailMessage = sub.message;
       }
-      return { passed: false, message: lastFailMessage };
+      return uncertain ?? { passed: false, message: lastFailMessage };
     }
 
     case "custom": {
@@ -284,6 +297,7 @@ export function validate(
       const found = result.rows.some((row) =>
         indexes.some((i) => cellsEqual(row[i], rule.value, rule.tolerance))
       );
+      if (!found && result.truncated) return incompleteResult();
       return {
         passed: found,
         message: found ? "Нужное значение найдено." : "Нужного значения в результате нет.",
@@ -296,7 +310,7 @@ export function validate(
         expected = rule.values;
       } else if (rule.referenceQuery) {
         const ref = executeQuery(db, rule.referenceQuery);
-        if (ref.error) return referenceError();
+        if (ref.error || ref.truncated) return referenceError();
         expected = ref.rows.map((r) => r[0]);
       } else {
         return referenceError();
@@ -339,7 +353,7 @@ export function validate(
 
     case "rows_match": {
       const ref = executeQuery(db, rule.referenceQuery);
-      if (ref.error) return referenceError();
+      if (ref.error || ref.truncated) return referenceError();
       if (result.rowCount !== ref.rowCount) {
         return {
           passed: false,
@@ -390,6 +404,7 @@ export function validate(
 
     case "not": {
       const sub = validate(rule.rule, result, db, ctx);
+      if (sub.inconclusive) return sub;
       return sub.passed
         ? { passed: false, message: rule.message }
         : { passed: true, message: "Проверка пройдена." };
@@ -399,6 +414,7 @@ export function validate(
       const state = executeQuery(db, rule.query);
       if (state.error) return referenceError();
       const sub = validate(rule.rule, state, db, ctx);
+      if (sub.inconclusive) return sub;
       return sub.passed
         ? { passed: true, message: "Состояние базы — как нужно." }
         : { passed: false, message: "Данные в базе пока не в нужном состоянии." };
@@ -412,11 +428,11 @@ export function validate(
       if (view.error) return { passed: false, message: `Представление «${rule.view}» не читается: ${view.error}` };
       if (rule.referenceQuery) {
         const rows = validate({ type: "rows_match", referenceQuery: rule.referenceQuery, ordered: rule.ordered }, view, db, ctx);
-        if (!rows.passed) return { passed: false, message: `В представлении «${rule.view}»: ${lowerFirst(rows.message)}` };
+        if (!rows.passed) return { ...rows, message: `В представлении «${rule.view}»: ${lowerFirst(rows.message)}` };
       }
       if (rule.rule) {
         const sub = validate(rule.rule, view, db, ctx);
-        if (!sub.passed) return { passed: false, message: `В представлении «${rule.view}»: ${lowerFirst(sub.message)}` };
+        if (!sub.passed) return { ...sub, message: `В представлении «${rule.view}»: ${lowerFirst(sub.message)}` };
       }
       return { passed: true, message: `Представление «${rule.view}» собрано верно.` };
     }

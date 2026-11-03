@@ -46,6 +46,8 @@ export interface DeskLayoutProps {
   onMenu?: () => void;
   /** Дополнительные элементы в строке окна справа */
   topBarExtra?: ReactNode;
+  /** Постоянное предупреждение над рабочим столом, включая мобильный вид */
+  warning?: ReactNode;
   /** Левая колонка — обычно SchemaPanel */
   schema: ReactNode;
   /** Центр сверху — SqlTerminal */
@@ -131,6 +133,7 @@ export function DeskLayout({
   dateTime,
   onMenu,
   topBarExtra,
+  warning,
   schema,
   terminal,
   results,
@@ -490,6 +493,8 @@ export function DeskLayout({
         </span>
         {time && <span className="mono-12 text-ink-2">{time}</span>}
       </div>
+
+      {warning && <div role="alert" className="shrink-0 border-b border-line bg-scr-chrome px-4 py-2 ui-13 text-alarm">{warning}</div>}
 
       {/* ---------- Три колонки ---------- */}
       <DeskCenterTabsContext.Provider value={center === "query" ? centerTabs : null}>

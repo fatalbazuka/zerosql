@@ -2,13 +2,13 @@
  * EngineClient (разд. 6.14, п. 1): единственный путь стора к ядру.
  *
  * Режим worker: ядро в модульном Web Worker. Запрос дольше 3 с обрывается
- * (у sql.js нет прерывания): воркер убивается, новый поднимается из байтов
- * мира в IndexedDB, база дела собирается заново и журнал воспроизводится
+ * (у sql.js нет прерывания): воркер убивается, мир загружается из IndexedDB
+ * или генерируется заново, база дела собирается и журнал воспроизводится
  * детерминированно (патчи, живые строки, DML игрока, query_log). Затем
  * run() возвращает результат с errorKind 'timeout' и объяснением.
  *
  * Режим in-process: то же ядро в том же потоке, без таймаута — для тестов
- * и браузеров без Worker/IndexedDB. Сообщения так же проходят structured
+ * и браузеров без Worker. Сообщения так же проходят structured
  * clone, поэтому несериализуемое падает одинаково в обоих режимах.
  */
 import type { CaseDef } from "@/types/case";
@@ -396,8 +396,8 @@ function inProcessCache() {
 }
 
 /**
- * Клиент ядра для стора. По умолчанию (mode: 'auto') — Web Worker с
- * таймаутом 3 с, если в среде есть Worker и IndexedDB, иначе — тот же поток.
+ * Клиент ядра для стора. При наличии Worker запросы прерываемы даже без
+ * IndexedDB; после сбоя без кеша мир придётся сгенерировать заново.
  */
 export function createEngineClient(options: EngineClientOptions = {}): EngineClient {
   const hasWorker = Boolean(options.workerFactory) || typeof Worker !== "undefined";
@@ -410,8 +410,7 @@ export function createEngineClient(options: EngineClientOptions = {}): EngineCli
       useWorker = hasWorker;
       break;
     default:
-      // Без IndexedDB воркер после таймаута собирал бы мир заново — тогда проще в том же потоке
-      useWorker = Boolean(options.workerFactory) || (hasWorker && indexedDbAvailable());
+      useWorker = hasWorker;
   }
   if (useWorker) {
     const factory = options.workerFactory ?? defaultWorkerFactory;

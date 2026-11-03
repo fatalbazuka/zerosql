@@ -15,6 +15,7 @@ import { useEffect, useMemo, useSyncExternalStore } from "react";
 import { useStore } from "zustand";
 import { createGameStore, type GameState, type GameStore } from "./store";
 import { watchSfx } from "./sfx";
+import { getSaveStatus, subscribeSaveStatus } from "./persist";
 
 export const gameStore = createGameStore({ skipHydration: true });
 
@@ -53,6 +54,11 @@ export function useHydrated(): boolean {
 /** Звуковая шина стола: подключить один раз в корневом клиентском компоненте */
 export function useSfxBus(): void {
   useEffect(() => watchSfx(gameStore), []);
+}
+
+/** Доступность постоянного сохранения может измениться при ошибке записи. */
+export function useSaveStatus() {
+  return useSyncExternalStore(subscribeSaveStatus, getSaveStatus, () => "unknown" as const);
 }
 
 export { playSfx, SFX_MIX, type SfxName, type SfxCategory } from "./sfx";
