@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import type { DeskCenterView, DeskPanelId, EvidenceCardData, ProtocolMessage } from "@/types/ui";
 import type { CaseDef } from "@/types/case";
 import {
@@ -15,9 +15,9 @@ import {
   seenValues,
   useGame,
   useGameView,
-  type Bark,
+  useSaveStatus,
 } from "@/stores/game";
-import { DeskLayout, type DeskMenuAction, type DeskMenuGroup, type StatusMessage } from "@/components/desk/desk-layout";
+import { DeskLayout, type DeskMenuAction, type DeskMenuGroup } from "@/components/desk/desk-layout";
 import { SchemaPanel } from "@/components/desk/schema-panel";
 import { SqlTerminal, type SqlEditorHandle } from "@/components/desk/sql-terminal";
 import { ResultsGrid, type ResultObjectiveNote } from "@/components/desk/results-grid";
@@ -33,9 +33,9 @@ import { AccusationPanel, PredictionPrompt } from "@/components/play/accusation"
 import { MirrorWindow } from "@/components/play/mirror-window";
 import { ScreenButton } from "@/components/kit/screen";
 import { RichText } from "@/components/kit/rich-text";
-import { achievements, secrets } from "@/data";
 import { CHARACTERS, caseCode, caseNo, clockRu, sceneTitle, evidenceCard, handbookFor, hhmm, pinCard, protocolQuestions, uiObjectives } from "./views";
 import { useSceneLayer } from "./scene-layer";
+import { useDeskMessages, useIdleHint } from "./desk-effects";
 
 const MENUS: DeskMenuGroup[] = [
   {
@@ -76,15 +76,6 @@ const MENUS: DeskMenuGroup[] = [
   },
 ];
 
-const SYSTEM = new Set(["mira", "system", "narrator"]);
-const LINE_ID = /^[a-z]+\.[\w.-]+$/;
-const isPerson = (b: Bark) => !SYSTEM.has(b.speaker) && Boolean(CHARACTERS[b.speaker]);
-/** Наводка (kind system от персонажа) уже видна в блокноте; строка-id без текста не показывается */
-const isSilent = (b: Bark) => (b.kind === "system" && isPerson(b)) || LINE_ID.test(b.text);
-
-/** Простой без запроса: 2 минуты — Нина предлагает помощь (библия 7.1) */
-const IDLE_MS = 120_000;
-
 export function CaseDesk({
   def,
   onJournal,
@@ -104,10 +95,10 @@ export function CaseDesk({
   const schema = useGame((s) => s.schema);
   const foreignKeys = useGame((s) => s.foreignKeys);
   const playerViews = useGame((s) => s.playerViews);
-  const barks = useGame((s) => s.barks);
-  const toasts = useGame((s) => s.toasts);
   const profile = useGame((s) => s.profile);
   const settings = useGame((s) => s.settings);
+  const saveStatus = useSaveStatus();
+  const { status, say, people } = useDeskMessages();
   const objectives = useGameView(objectivesView);
   const protocol = useGameView(protocolView);
   const budget = useGameView(budgetOf);
@@ -119,14 +110,11 @@ export function CaseDesk({
   const [panel, setPanel] = useState<DeskPanelId>("tasks");
   const [center, setCenter] = useState<DeskCenterView>("query");
   const [wallFocus, setWallFocus] = useState<string | null>(null);
-  const [status, setStatus] = useState<StatusMessage | null>(null);
   const [seenPins, setSeenPins] = useState(session.pins.length);
   const [locked, setLocked] = useState(false);
   const [history, setHistory] = useState(false);
   const [accQuery, setAccQuery] = useState<Record<string, string>>({});
   const [predictionOff, setPredictionOff] = useState<string | null>(null);
-  const seq = useRef(0);
-  const say = (text: string) => setStatus({ id: `l${++seq.current}`, text });
 
   // Строки, приобщённые из текущего результата
   const [pinned, setPinned] = useState<{ of: typeof last; rows: number[] }>({ of: last, rows: [] });
@@ -157,32 +145,12 @@ export function CaseDesk({
           ? { text: `задание ${currentNo} не засчитано`, tone: "miss" }
           : null;
 
-  /* ----- системные сообщения: МИРА и события — в строку состояния, люди — в мессенджер ----- */
-  useEffect(() => {
-    const sys = barks.filter((b) => !isPerson(b) || isSilent(b));
-    const toast = toasts[toasts.length - 1];
-    if (sys.length === 0 && !toast) return;
-    const t = window.setTimeout(() => {
-      const shown = sys.filter((b) => !isSilent(b)).pop();
-      if (toast) {
-        const title = (toast.kind === "secret" ? secrets : achievements).find((x) => x.id === toast.refId)?.title;
-        const what = toast.kind === "secret" ? "Найден тайник" : "Отметка в личном деле";
-        setStatus({ id: `t${toast.id}`, text: title ? `${what}: «${title}».` : `${what}.` });
-      } else if (shown) setStatus({ id: `b${shown.id}`, text: shown.text });
-      sys.forEach((b) => act().dismissBark(b.id));
-      toasts.forEach((x) => act().dismissToast(x.id));
-    }, 0);
-    return () => window.clearTimeout(t);
-  }, [barks, toasts, act]);
-  const people = barks.filter((b) => isPerson(b) && !isSilent(b));
   const message = people[0];
 
-  /* ----- простой: предложить подсказку ----- */
-  useEffect(() => {
-    if (session.phase !== "desk" || session.hintOffer) return;
-    const t = window.setTimeout(() => act().offerHint(), IDLE_MS);
-    return () => window.clearTimeout(t);
-  }, [session.draftSql, last, session.phase, session.hintOffer, act]);
+  useIdleHint(
+    session.phase === "desk" && !session.hintOffer && !session.stage && !session.interrogation && !busy && !locked && !history && Boolean(current?.nextHint),
+    current?.id
+  );
 
   /* ----- запрос ----- */
   const run = async () => {
@@ -212,7 +180,7 @@ export function CaseDesk({
   const onMenuAction = (a: DeskMenuAction) => {
     switch (a) {
       case "save":
-        say("Сеанс сохранён.");
+        say(saveStatus === "persistent" ? "Автосохранение включено." : saveStatus === "volatile" ? "Сохранение недоступно: прогресс пропадёт при перезагрузке или закрытии страницы." : "Сохранение ещё не готово.");
         break;
       case "journal":
         onJournal();
@@ -221,7 +189,13 @@ export function CaseDesk({
         onSettings();
         break;
       case "reset":
-        void act().restartCase().then(() => say("База дела откачена к началу. Прогресс сохранён."));
+        if (busy) {
+          say("Дождитесь завершения запроса.");
+          break;
+        }
+        if (window.confirm("Откатить базу дела? Изменения данных и созданные вами представления будут удалены. Задания, материалы и игровое время сохранятся.")) {
+          void act().restartCase().then(() => say("База дела восстановлена. Прогресс сохранён.")).catch(() => say("Не удалось откатить базу дела."));
+        }
         break;
       case "lock":
         playSfx("ui.lock", settings);
@@ -369,6 +343,11 @@ export function CaseDesk({
           if (wrong) act().setDraft(act().session!.draftSql.replace(new RegExp(`\\b${wrong}\\b`, "g"), name));
         }}
       />
+      {last?.feedback && !last.result.error && (
+        <p role="status" data-testid="result-feedback" className="shrink-0 border-t border-line bg-scr-base px-3 py-2 ui-13 text-ink-1">
+          Не засчитано: {last.feedback}
+        </p>
+      )}
     </div>
   );
 
@@ -396,6 +375,7 @@ export function CaseDesk({
       badges={cards.length ? { evidence: cards.length } : {}}
       badgeAlerts={unseen ? ["evidence"] : []}
       statusMessage={status}
+      warning={saveStatus === "volatile" ? "Сохранение недоступно: прогресс пропадёт при перезагрузке или закрытии страницы." : undefined}
       currentObjective={current && currentNo ? {
         number: currentNo,
         text: current.task,

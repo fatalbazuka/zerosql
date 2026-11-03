@@ -185,7 +185,7 @@ export interface GameStoreOptions {
   cases?: readonly CaseDef[];
   achievements?: readonly AchievementDef[];
   secrets?: readonly SecretDef[];
-  /** Ядро; по умолчанию createEngineClient (worker, если есть Worker и IndexedDB) */
+  /** Ядро; по умолчанию createEngineClient (worker, если доступен) */
   engine?: () => EngineClient;
   engineOptions?: EngineClientOptions;
   storage?: () => Storage;
@@ -196,7 +196,6 @@ export interface GameStoreOptions {
 }
 
 const MIRA = "mira";
-const MAX_BARKS = 12;
 const ROLLBACK_LINE = "Архив обновился. Твою открытую транзакцию я откатила — повтори, если нужно.";
 const BUDGET_LINE = "Лимит запросов по делу исчерпан. Дальше — только выводы.";
 
@@ -415,7 +414,7 @@ export function createGameStore(options: GameStoreOptions = {}): GameStore {
 
         const bark = (kind: BarkKind, speaker: string, text: string, extra: Partial<Bark> = {}) => {
           const item: Bark = { id: ++barkSeq, kind, speaker, text, ...extra };
-          set((st) => ({ barks: [...st.barks, item].slice(-MAX_BARKS) }));
+          set((st) => ({ barks: [...st.barks, item] }));
         };
 
         const toast = (kind: "secret" | "achievement", refId: string) =>
@@ -800,7 +799,7 @@ export function createGameStore(options: GameStoreOptions = {}): GameStore {
           async restartCase() {
             if (!(await ensureOpen())) return;
             const opened = await engine().resetCase();
-            set({ schema: opened.schema, foreignKeys: opened.foreignKeys, playerViews: opened.playerViews });
+            set({ schema: opened.schema, foreignKeys: opened.foreignKeys, playerViews: opened.playerViews, last: null });
             patchSession((x) => ({ ...x, clock: opened.clock, journal: [...engine().getJournal()] }));
           },
 

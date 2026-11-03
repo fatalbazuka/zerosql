@@ -4,6 +4,7 @@ import {
   useCallback,
   useEffect,
   useLayoutEffect,
+  useId,
   useRef,
   useState,
   useSyncExternalStore,
@@ -254,6 +255,7 @@ function DataTable({
   const scrollRef = useRef<HTMLDivElement>(null);
   const cols = result.columns.length;
   const touch = useTouchOnly();
+  const instructionsId = useId();
 
   // Новый результат — выделение сбрасывается (паттерн «состояние от пропса»)
   const [seenResult, setSeenResult] = useState(result);
@@ -358,11 +360,14 @@ function DataTable({
 
   return (
     <>
+      <p id={instructionsId} className="sr-only">Стрелки выбирают ячейку, Enter открывает её, Ctrl+Shift+Enter приобщает строку, Escape снимает выделение.</p>
+      <span className="sr-only" aria-live="polite">{inspector && sel ? `Строка ${sel.r + 1}, ${inspector.value}` : ""}</span>
       <div
         ref={scrollRef}
         tabIndex={0}
         role="region"
         aria-label="Строки результата"
+        aria-describedby={instructionsId}
         data-results-focus
         onKeyDown={onKeyDown}
         className="zs-scroll-strong relative min-h-0 flex-1 overflow-auto focus-visible:outline-offset-[-1px] lg:overflow-x-scroll"
@@ -465,7 +470,6 @@ function DataTable({
             ) : (
               <button
                 type="button"
-                tabIndex={-1}
                 data-testid="pin-row"
                 onClick={() => pin(sel.r)}
                 className={cn(screenButtonClass("text"), "ml-auto shrink-0 ui-12")}
@@ -483,7 +487,7 @@ function DataTable({
           cols === 0
             ? ["Запрос выполнен.", formatMs(result.executionTimeMs)]
             : [
-                countOf(result.rowCount, ["строка", "строки", "строк"]),
+                `${result.truncated ? "не менее " : ""}${countOf(result.rowCount + (result.truncated ? 1 : 0), ["строка", "строки", "строк"])}`,
                 countOf(cols, ["столбец", "столбца", "столбцов"]),
                 formatMs(result.executionTimeMs),
               ]
@@ -495,7 +499,7 @@ function DataTable({
               <span className="text-ink-1">показаны первые {formatInt(rows.length)}</span>
             )}
             {hiddenRight > 0 && (
-              <button type="button" tabIndex={-1} onClick={scrollToNextHidden} className="text-ink-1 hover:underline underline-offset-[3px]">
+              <button type="button" onClick={scrollToNextHidden} className="text-ink-1 hover:underline underline-offset-[3px]">
                 {`ещё ${countOf(hiddenRight, ["столбец", "столбца", "столбцов"])} справа\u00A0→`}
               </button>
             )}

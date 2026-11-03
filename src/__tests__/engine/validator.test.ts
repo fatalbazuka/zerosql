@@ -457,3 +457,33 @@ describe("any_of", () => {
     expect(r.passed).toBe(false);
   });
 });
+
+describe("неполные результаты", () => {
+  const truncated = makeResult({ columns: ["n"], rows: [[1], [2]], rowCount: 2, truncated: true });
+  const countRule: ValidationRule = { type: "row_count", expected: 2, comparison: "eq" };
+
+  it("не засчитывает совпадение и не превращает неопределённость в успех через not", () => {
+    expect(validate(countRule, truncated, db)).toMatchObject({ passed: false, inconclusive: true });
+    expect(validate({ type: "not", rule: countRule, message: "лишние строки" }, truncated, db)).toMatchObject({ passed: false, inconclusive: true });
+    expect(validate({ type: "not", rule: { type: "contains_value", column: "n", value: 3 }, message: "найдено" }, truncated, db)).toMatchObject({ passed: false, inconclusive: true });
+  });
+
+  it("засчитывает найденное значение и независимые от строк правила", () => {
+    expect(validate({ type: "contains_value", column: "n", value: 2 }, truncated, db).passed).toBe(true);
+    expect(validate({ type: "contains_columns", columns: ["n"] }, truncated, db).passed).toBe(true);
+    expect(validate({ type: "table_state", query: "SELECT 1 AS n", rule: { type: "cell_value", value: 1 } }, truncated, db).passed).toBe(true);
+  });
+
+  it("составные проверки сохраняют неопределённость, но any_of принимает доказанный вариант", () => {
+    const negative: ValidationRule = { type: "not", rule: { type: "any_of", rules: [countRule, { type: "contains_value", column: "n", value: 3 }], successMessage: "да" }, message: "нет" };
+    expect(validate(negative, truncated, db)).toMatchObject({ passed: false, inconclusive: true });
+    expect(validate({ type: "any_of", rules: [countRule, { type: "contains_value", column: "n", value: 1 }], successMessage: "да" }, truncated, db).passed).toBe(true);
+  });
+
+  it("не сравнивает первые 5000 строк с усечённым эталоном", () => {
+    const large = "WITH RECURSIVE n(x) AS (VALUES(1) UNION ALL SELECT x+1 FROM n WHERE x<5001) SELECT x FROM n";
+    const result = makeResult({ columns: ["x"], rows: Array.from({ length: 5000 }, (_, i) => [i + 1]), rowCount: 5000 });
+    const outcome = validate({ type: "not", rule: { type: "rows_match", referenceQuery: large }, message: "совпало" }, result, db);
+    expect(outcome).toMatchObject({ passed: false, inconclusive: true });
+  });
+});
